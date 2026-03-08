@@ -1,10 +1,6 @@
-:isso-id: /notes/writeups/leetcode/index
-
 =================
 Leetcode 刷题记录
 =================
-
-:date: 2021-03-10
 
 .. tip::
 

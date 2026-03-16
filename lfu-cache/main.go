@@ -1,146 +1,106 @@
 package main
 
-import "container/list"
-
-type Pair struct {
-	Key   int
-	Value int
-	Freq  int
-}
+import (
+	"container/list"
+)
 
 type LFUCache struct {
 	capacity int
-	freq     *list.List
-	elems    map[int]*list.Element
+	store map[int]*Entry // key → entry
+	minFreq int
+	bucket map[int]*list.List // freq → lru entry list
+}
+
+type Entry struct {
+	key int
+	val int
+	freq int
+	elem *list.Element
 }
 
 func Constructor(capacity int) LFUCache {
 	return LFUCache{
 		capacity: capacity,
-		freq:     list.New(),
-		elems:    make(map[int]*list.Element),
+		store: make(map[int]*Entry),
+		minFreq: 0,
+		bucket: make(map[int]*list.List),
 	}
 }
+
 
 func (this *LFUCache) Get(key int) int {
-	if elem, ok := this.elems[key]; ok {
-		this.touch(elem)
-		return elem.Value.(*Pair).Value
-	} else {
-		return -1
-	}
-}
-
-func (this *LFUCache) touch(elem *list.Element) {
-	elem.Value.(*Pair).Freq += 1
-	// println("touch", elem.Value.(*Pair).Value, elem.Value.(*Pair).Freq)
-	for e := elem.Prev(); e != nil; e = e.Prev() {
-		if e.Value.(*Pair).Freq <= elem.Value.(*Pair).Freq {
-			// println("move", elem.Value.(*Pair).Value, "before", e.Value.(*Pair).Value)
-			// println("freq", elem.Value.(*Pair).Freq, e.Value.(*Pair).Freq)
-			this.freq.MoveBefore(elem, e)
-		}
-	}
-}
-
-func (this *LFUCache) Put(key int, value int) {
-	// println("put", key, value)
-	pair := Pair{Key: key, Value: value, Freq: 0}
-	if elem, ok := this.elems[key]; ok {
-		this.touch(elem)
-		elem.Value.(*Pair).Value = value
-	} else if len(this.elems) >= this.capacity {
-		if this.capacity == 0 {
-			return
-		}
-		oldElem := this.freq.Back()
-		// println("pop", oldElem.Value.(*Pair).Key)
-		delete(this.elems, oldElem.Value.(*Pair).Key)
-		this.freq.Remove(oldElem)
-		elem := this.freq.PushBack(&pair)
-		this.touch(elem)
-		this.elems[key] = elem
-	} else {
-		elem := this.freq.PushBack(&pair)
-		this.touch(elem)
-		this.elems[key] = elem
-	}
-}
-
-// ----------------------------------------------------------------------------
-
-type LFUCache2 struct {
-	capacity int
-	elems    map[int]*list.Element
-	freq     map[int]*list.List
-	min      int
-}
-
-func Constructor2(capacity int) LFUCache2 {
-	return LFUCache2{
-		capacity: capacity,
-		freq:     make(map[int]*list.List),
-		elems:    make(map[int]*list.Element),
-	}
-}
-
-func (this *LFUCache2) Get(key int) int {
-	if elem, ok := this.elems[key]; ok {
-		this.touch(elem)
-		return elem.Value.(*Pair).Value
-	} else {
-		return -1
-	}
-}
-
-func (this *LFUCache2) touch(elem *list.Element) {
-	pair := elem.Value.(*Pair)
-	oldList := this.freq[pair.Freq]
-	oldList.Remove(elem)
-	if oldList.Len() == 0 && pair.Freq == this.min {
-		this.min++
-	}
-
-	// Incr fre
-	pair.Freq++
-	newList, ok := this.freq[pair.Freq]
+	entry, ok := this.store[key]
 	if !ok {
-		newList = list.New()
-		this.freq[pair.Freq] = newList
+		return -1
 	}
-	newElem := newList.PushFront(pair)
-	this.elems[pair.Key] = newElem
+	this.touch(entry)
+	return entry.val
 }
 
-func (this *LFUCache2) Put(key int, value int) {
-	if this.capacity == 0 {
-		return
+func (this *LFUCache) touch(entry *Entry) {
+	oldlist := this.bucket[entry.freq]
+	oldlist.Remove(entry.elem)
+	if oldlist.Len() == 0 {
+		delete(this.bucket, entry.freq)
+		if this.minFreq == entry.freq {
+			this.minFreq++
+		}
 	}
-	// println("put", key, value)
-	if elem, ok := this.elems[key]; ok {
-		this.touch(elem)
-		elem.Value.(*Pair).Value = value
+
+	newlist, ok := this.bucket[entry.freq+1]
+	if !ok {
+		newlist = list.New()
+		this.bucket[entry.freq+1] = newlist
+	} 
+	newelem := newlist.PushFront(entry)
+	entry.elem = newelem
+	entry.freq++
+}
+
+func (this *LFUCache) Put(key int, value int)  {
+	entry, ok := this.store[key]
+	if ok {
+		entry.val = value
+		this.touch(entry)
 		return
 	}
 
-	if len(this.elems) >= this.capacity {
-		lst := this.freq[this.min]
-		oldElem := lst.Back()
-		// println("pop", oldElem.Value.(*Pair).Key)
-		delete(this.elems, oldElem.Value.(*Pair).Key)
-		lst.Remove(oldElem)
+	if this.capacity <= 0 {
+		return
 	}
 
-	this.min = 1
-	pair := Pair{Key: key, Value: value, Freq: 1}
-	lst, ok := this.freq[1]
+	if len(this.store) >= this.capacity {
+		lst := this.bucket[this.minFreq]
+		entry = lst.Remove(lst.Back()).(*Entry)
+		delete(this.store, entry.key)
+		if lst.Len() == 0 {
+			delete(this.bucket, this.minFreq)
+		}
+	}
+
+	entry = &Entry {
+		key: key,
+		val: value,
+		freq: 1,
+	}
+	this.store[key] = entry
+	this.minFreq = 1
+	lst, ok := this.bucket[1]
 	if !ok {
 		lst = list.New()
-		this.freq[1] = lst
+		this.bucket[1] = lst
 	}
-	elem := lst.PushFront(&pair)
-	this.elems[key] = elem
+	elem := lst.PushFront(entry)
+	entry.elem = elem
 }
+
+
+/**
+ * Your LFUCache object will be instantiated and called as such:
+ * obj := Constructor(capacity);
+ * param_1 := obj.Get(key);
+ * obj.Put(key,value);
+ */
 
 func main() {
 	/**
@@ -151,7 +111,7 @@ func main() {
 	//obj.Put(1, 1)
 	//println(obj.Get(1))
 
-	obj2 := Constructor2(2)
+	obj2 := Constructor(2)
 	obj2.Put(1, 1)
 	obj2.Put(2, 2)
 	println(obj2.Get(1)) // touch

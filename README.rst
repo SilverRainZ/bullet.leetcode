@@ -62,7 +62,7 @@ LFU Cache
    :diffculty: Medium
    :language: go
    :date: 2021-05-08 2021-7-22
-   :reference: https://github.com/halfrost/Halfrost-Field/blob/master/contents/Go/LRU:LFU_interview.md
+   :reference: https://github.com/halfrost/Halfrost-Field/blob/master/contents/Go/LRU_LFU_interview.md
 
 解法 1
    在 touch 一个元素的的时候从链表尾部往上找，是一个 :math:`O(n)` 的操作，然而
@@ -736,14 +736,19 @@ Sort an Array
    :diffculty: Medium
    :language: rust
    :key: 排序
-   :date: 2021-07-19
+   :date: 2021-07-19 2026-03-16
    :reference: https://rust-algo.club/sorting/quicksort
 
-:2021-07-17: 情绪又不好了，看了近两个小时的快排教程没看进去。
+2021-07-17
+   情绪又不好了，看了近两个小时的快排教程没看进去。
 
-使用固定 pivot 的普通的快排会 TLE，因为有一个近乎有序的大数组 case。
+   pivot 固定为 ``nums[len-1]`` 会 TLE，因为有一个近乎有序的大数组 case，
+   导致 Partition 不均衡（数据倾斜）：分为 ``nums[0..len-2]`` 和 ``nums[nums-1..]``
 
-Rust 标准库没有生成随机数的函数……糊了一个。
+   Rust 标准库没有生成随机数的函数……糊了一个。
+
+2026-03-16
+   重新写了一遍，我比以前聪明诶。
 
 Combination Sum II
 ------------------
